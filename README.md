@@ -1,4 +1,4 @@
-# Molecul Docking (Streamlit Demo)
+# Molecule Docking
 
 This repository contains a demo Streamlit application for molecular docking. It supports two modes:
 
