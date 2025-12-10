@@ -11,6 +11,8 @@ try:
 except Exception:
     RDKit_available = False
 
+from statistics import mean, stdev
+
 st.set_page_config(page_title="Molecule Docking Online", layout="wide")
 
 st.title("Molecule Docking Online")
@@ -28,8 +30,34 @@ if receptor_file is not None:
 
 use_vina = is_vina_available()
 
-st.sidebar.markdown(f"**Vina available:** {'Yes' if use_vina else 'No (will use mock docking)'}")
-st.sidebar.markdown(f"**RDKit available:** {'Yes' if RDKit_available else 'No (images may not render)'}")
+st.sidebar.markdown(f"**Vina available:** {'✅ Yes — AutoDock Vina backend' if use_vina else '⚠️ No — mock docking fallback'}")
+st.sidebar.markdown(f"**RDKit available:** {'✅ Yes — molecule rendering & SDF' if RDKit_available else '❌ No — images may not render'}")
+
+
+def compute_insights(poses: list) -> dict:
+    """Compute simple insights from docking poses: best/avg/stdev/range.
+
+    This returns a dictionary suitable for display in the Streamlit UI.
+    """
+    scores = [p.get('score') for p in poses if p.get('score') is not None]
+    insights = {"count": len(poses), "best": None, "avg": None, "stdev": None, "range": None, "interpretation": ''}
+    if not scores:
+        return insights
+    best = min(scores)
+    avg = mean(scores)
+    sdev = stdev(scores) if len(scores) > 1 else 0.0
+    rmin, rmax = min(scores), max(scores)
+    insights.update({"best": best, "avg": avg, "stdev": sdev, "range": (rmin, rmax)})
+    # Simple heuristic
+    if best <= -9:
+        insights['interpretation'] = 'Strong predicted binder — consider experimental validation (🔬)'
+    elif best <= -7:
+        insights['interpretation'] = 'Moderate predicted binder — interesting candidate (⭐)'
+    elif best <= -5:
+        insights['interpretation'] = 'Weak predicted binder — may need optimization (⚠️)'
+    else:
+        insights['interpretation'] = 'Poor predicted binding — likely not promising (❌)'
+    return insights
 
 # Compute grid button is intentionally placed before the number inputs so the handler sets session_state
 # before the number_input widgets are instantiated (avoids session_state modification error).
@@ -97,7 +125,7 @@ if run_button:
                     try:
                         rec_to_use = os.path.join(tmpdir, os.path.splitext(receptor_file.name)[0] + '.pdbqt')
                         convert_to_pdbqt(rec_path, rec_to_use)
-                        st.info('Receptor converted to PDBQT')
+                        st.info('Receptor converted to PDBQT ✅')
                     except Exception as e:
                         st.warning(f'Receptor conversion failed: {e}; running mock docking')
                         use_vina = False
@@ -105,7 +133,7 @@ if run_button:
                     try:
                         lig_to_use = os.path.join(tmpdir, os.path.splitext(ligand_file.name)[0] + '.pdbqt')
                         convert_to_pdbqt(lig_path, lig_to_use)
-                        st.info('Ligand converted to PDBQT')
+                        st.info('Ligand converted to PDBQT ✅')
                     except Exception as e:
                         st.warning(f'Ligand conversion failed: {e}; running mock docking')
                         use_vina = False
@@ -132,7 +160,31 @@ if run_button:
                 st.warning("No poses found")
             else:
                 st.success(f"Found {len(poses)} poses")
+                # Compute and display insights summary
+                insights = compute_insights(poses)
+                if insights.get('best') is not None:
+                    best = insights['best']
+                    avg = insights['avg']
+                    sdev = insights['stdev']
+                    rmin, rmax = insights['range']
+                    interpretation = insights['interpretation']
+                    st.markdown("---")
+                    st.markdown("**Summary** 📊")
+                    st.write(f"- Count: **{insights['count']}**")
+                    st.write(f"- Best score: **{best:.3f} kcal/mol** 🏆")
+                    st.write(f"- Average score: **{avg:.3f} kcal/mol**")
+                    st.write(f"- Score range: **{rmin:.3f} — {rmax:.3f} kcal/mol**")
+                    if sdev is not None:
+                        st.write(f"- Std dev: **{sdev:.3f}**")
+                    st.info(f"Interpretation: {interpretation}")
+                    st.caption("Note: Vina-style docking scores are in kcal/mol; lower (more negative) indicates stronger predicted binding 🧭")
                 cols = st.columns(3)
+                # mark index of top pose (top = lowest score)
+                best_score = None
+                for p in poses:
+                    if p.get('score') is not None:
+                        if best_score is None or p['score'] < best_score:
+                            best_score = p['score']
                 for i, pose in enumerate(poses, 1):
                     col = cols[(i - 1) % 3]
                     # pose should be a dict: {'score': float, 'mol': rdkit Mol or pdbqt path}
@@ -148,8 +200,11 @@ if run_button:
                         except Exception:
                             img = None
                     with col:
-                        st.subheader(f"Pose {i}")
-                        st.write(f"Score: {score:.3f}" if score is not None else "Score: N/A")
+                        title = f"Pose {i}"
+                        if pose.get('score') is not None and best_score is not None and abs(pose.get('score') - best_score) < 1e-6:
+                            title += " — 🏆 Best"
+                        st.subheader(title)
+                        st.write(f"Score: {score:.3f} kcal/mol" if score is not None else "Score: N/A")
                         if img is not None:
                             st.image(img, use_column_width=True)
                         elif pdbqt_block is not None:
@@ -175,7 +230,7 @@ if run_button:
                             try:
                                 save_mol_to_sdf(mol, out_path, confId=confId)
                                 with open(out_path, "rb") as f:
-                                    st.download_button(f"Download pose {i}", data=f, file_name=f"pose_{i}.sdf")
+                                    st.download_button(f"⬇️ Download pose {i} (SDF)", data=f, file_name=f"pose_{i}.sdf")
                             except Exception:
                                 pass
                         elif pdbqt_block is not None:
@@ -184,7 +239,7 @@ if run_button:
                                 with open(out_path, "w") as f:
                                     f.write(pdbqt_block)
                                 with open(out_path, "rb") as f:
-                                    st.download_button(f"Download pose {i}", data=f, file_name=f"pose_{i}.pdbqt")
+                                    st.download_button(f"⬇️ Download pose {i} (PDBQT)", data=f, file_name=f"pose_{i}.pdbqt")
                             except Exception:
                                 pass
                         elif pdb_block is not None:
@@ -193,7 +248,7 @@ if run_button:
                                 with open(out_path, "w") as f:
                                     f.write(pdb_block)
                                 with open(out_path, "rb") as f:
-                                    st.download_button(f"Download pose {i}", data=f, file_name=f"pose_{i}.pdb")
+                                    st.download_button(f"⬇️ Download pose {i} (PDB)", data=f, file_name=f"pose_{i}.pdb")
                             except Exception:
                                 pass
                         
@@ -215,11 +270,11 @@ if convert_button:
                 lig_out = os.path.join(tmpdir, os.path.splitext(ligand_file.name)[0] + ".pdbqt")
                 convert_to_pdbqt(rec_path, rec_out)
                 convert_to_pdbqt(lig_path, lig_out)
-                st.success("Conversion completed; files are available for download")
+                st.success("Conversion completed ✅ — files are available for download")
                 with open(rec_out, "rb") as f:
-                    st.download_button("Download receptor PDBQT", data=f, file_name=os.path.basename(rec_out))
+                    st.download_button("⬇️ Download receptor (PDBQT)", data=f, file_name=os.path.basename(rec_out))
                 with open(lig_out, "rb") as f:
-                    st.download_button("Download ligand PDBQT", data=f, file_name=os.path.basename(lig_out))
+                    st.download_button("⬇️ Download ligand (PDBQT)", data=f, file_name=os.path.basename(lig_out))
             except FileNotFoundError as e:
                 st.error(str(e))
                 st.info("Install Open Babel (obabel) with:\n- conda: `conda install -c conda-forge openbabel`\n- macOS (Homebrew): `brew install open-babel`\n- Debian/Ubuntu: `sudo apt-get install openbabel`")

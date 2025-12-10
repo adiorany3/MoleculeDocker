@@ -94,6 +94,12 @@ CI: a GitHub Actions workflow is included at `.github/workflows/ci.yml` that set
 - Otherwise, the app uses a mock docking algorithm with RDKit.
 - It displays poses and allows downloading SDF files for poses.
 
+## Results & Insight
+
+- The app now shows a **Summary** panel with a concise analysis of the docking run: count, best score (kcal/mol), average score, score range and standard deviation. The best (lowest) score is marked with a trophy icon 🏆.
+- The summary includes a simple heuristic interpretation (🔬/⭐/⚠️/❌) to quickly flag promising vs weak binders. Lower (more negative) scores indicate stronger predicted binding.
+- Download buttons include format labels and a download icon (⬇️) for quick recognition.
+
 Extra features:
 - **Convert to PDBQT**: use the Open Babel `obabel` CLI to convert uploaded PDB/MOL/SDF files to PDBQT (sidebar Convert to PDBQT button). If `obabel` isn't found, the app will show an error and fallback to mock docking.
 - **3D Viewer**: enable `Show 3D viewer (py3Dmol)` in the sidebar to visualize poses in the browser when py3Dmol is installed. Without RDKit the mock PDB pose still displays as a 3D model.
