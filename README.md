@@ -99,6 +99,33 @@ CI: a GitHub Actions workflow is included at `.github/workflows/ci.yml` that set
 - The app now shows a **Summary** panel with a concise analysis of the docking run: count, best score (kcal/mol), average score, score range and standard deviation. The best (lowest) score is marked with a trophy icon 🏆.
 - The summary includes a simple heuristic interpretation (🔬/⭐/⚠️/❌) to quickly flag promising vs weak binders. Lower (more negative) scores indicate stronger predicted binding.
 - Download buttons include format labels and a download icon (⬇️) for quick recognition.
+ - A sidebar control allows choosing the image width for pose thumbnails.
+ - Each pose shows a score-category badge (🔥/⭐/⚠️/❌) based on the score thresholds and the top pose is marked with a trophy 🏆.
+ - Summary metrics (Best, Average, Std Dev) are shown as visual cards for quick inspection.
+ - The app shows a **Best pose interpretation** panel for the top pose, including RDKit-based molecular descriptors (MW, H-bond donors/acceptors, TPSA, rotatable bonds, ligand efficiency) when RDKit is available — otherwise it shows PDB-based atom counts and a size estimate.
+
+How to improve docking results — practical tips:
+
+- **Prepare receptor & ligand carefully**: Remove crystallographic waters from the receptor, add hydrogens, assign protonation states (pH 7.4) and generate PDBQT files — these preprocessing steps reduce artifacts.
+- **Grid box selection**: Use `Compute grid from receptor` or set the center and size to cover the known binding pocket. Too small boxes truncate poses; too large boxes increase search space and may reduce effective sampling.
+- **Increase sampling**: Raise `exhaustiveness` (Vina) and `Number of poses` to explore more conformational space. Typical `exhaustiveness` values: 8–32. Double-check run times.
+- **Use multiple scoring functions / consensus**: Re-score top poses with alternative scoring functions or tools to reduce false positives and increase confidence.
+- **Clustering + consensus**: If pose variability is large, perform pose clustering (RMSD-based) and use consensus pose or representative centroid for analysis.
+- **Apply medicinal chemistry filters**: Check ligand properties (MW, TPSA, HBD/HBA, rotatable bonds, ligand efficiency) before investing in experimental validation.
+- **Check contacts**: If the app reports few contacts between the ligand and receptor, adjust grid or ligand placement — adding anchor points or constraints can help direct docking.
+
+Example: for a small ligand such as ethanol (SMILES: `CCO`) a strong score like `-8.0` yields ligand efficiency (LE) ≈ -2.67 (kcal/mol per heavy atom), which falls in the "Excellent" range and is labeled with 🔥.
+
+Quick snippet (Python) to compute a sample interpretation in a local REPL:
+```python
+from rdkit import Chem
+from docking.insights import compute_pose_interpretation
+mol = Chem.MolFromSmiles('CCO')
+mol = Chem.AddHs(mol)
+pose = {'mol': mol, 'score': -8.0}
+interp = compute_pose_interpretation(pose)
+print(interp['text'])
+```
 
 Extra features:
 - **Convert to PDBQT**: use the Open Babel `obabel` CLI to convert uploaded PDB/MOL/SDF files to PDBQT (sidebar Convert to PDBQT button). If `obabel` isn't found, the app will show an error and fallback to mock docking.

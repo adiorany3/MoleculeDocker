@@ -11,7 +11,7 @@ try:
 except Exception:
     RDKit_available = False
 
-from statistics import mean, stdev
+from docking.insights import compute_insights, compute_pose_interpretation
 
 st.set_page_config(page_title="Molecule Docking Online", layout="wide")
 
@@ -34,30 +34,9 @@ st.sidebar.markdown(f"**Vina available:** {'✅ Yes — AutoDock Vina backend' i
 st.sidebar.markdown(f"**RDKit available:** {'✅ Yes — molecule rendering & SDF' if RDKit_available else '❌ No — images may not render'}")
 
 
-def compute_insights(poses: list) -> dict:
-    """Compute simple insights from docking poses: best/avg/stdev/range.
+## insights functions previously in app.py have been moved to docking/insights.py
 
-    This returns a dictionary suitable for display in the Streamlit UI.
-    """
-    scores = [p.get('score') for p in poses if p.get('score') is not None]
-    insights = {"count": len(poses), "best": None, "avg": None, "stdev": None, "range": None, "interpretation": ''}
-    if not scores:
-        return insights
-    best = min(scores)
-    avg = mean(scores)
-    sdev = stdev(scores) if len(scores) > 1 else 0.0
-    rmin, rmax = min(scores), max(scores)
-    insights.update({"best": best, "avg": avg, "stdev": sdev, "range": (rmin, rmax)})
-    # Simple heuristic
-    if best <= -9:
-        insights['interpretation'] = 'Strong predicted binder — consider experimental validation (🔬)'
-    elif best <= -7:
-        insights['interpretation'] = 'Moderate predicted binder — interesting candidate (⭐)'
-    elif best <= -5:
-        insights['interpretation'] = 'Weak predicted binder — may need optimization (⚠️)'
-    else:
-        insights['interpretation'] = 'Poor predicted binding — likely not promising (❌)'
-    return insights
+# compute_pose_interpretation now lives in docking/insights.py and is imported at top of this file
 
 # Compute grid button is intentionally placed before the number inputs so the handler sets session_state
 # before the number_input widgets are instantiated (avoids session_state modification error).
@@ -99,8 +78,10 @@ size_z = st.sidebar.number_input("Size Z (Å)", value=st.session_state.get("size
 num_poses = st.sidebar.slider("Number of poses", min_value=1, max_value=20, value=5)
 exhaustiveness = st.sidebar.slider("Exhaustiveness (Vina)", min_value=1, max_value=32, value=8)
 show_3d = st.sidebar.checkbox("Show 3D viewer (py3Dmol)", value=False)
+image_width = st.sidebar.number_input("Image width (px)", min_value=100, max_value=1200, value=300, step=50, help="Width in pixels used for pose images; defaults to 300")
 
 run_button = st.sidebar.button("Run Docking")
+
 convert_button = st.sidebar.button("Convert to PDBQT (Open Babel)")
 
 if run_button:
@@ -171,13 +152,34 @@ if run_button:
                     st.markdown("---")
                     st.markdown("**Summary** 📊")
                     st.write(f"- Count: **{insights['count']}**")
-                    st.write(f"- Best score: **{best:.3f} kcal/mol** 🏆")
-                    st.write(f"- Average score: **{avg:.3f} kcal/mol**")
+                    # show metrics side-by-side
+                    m1, m2, m3 = st.columns(3)
+                    m1.metric("Best (kcal/mol)", f"{best:.3f}")
+                    m2.metric("Average (kcal/mol)", f"{avg:.3f}")
+                    m3.metric("Std dev", f"{sdev:.3f}" if sdev is not None else "0.000")
                     st.write(f"- Score range: **{rmin:.3f} — {rmax:.3f} kcal/mol**")
                     if sdev is not None:
-                        st.write(f"- Std dev: **{sdev:.3f}**")
+                        pass
                     st.info(f"Interpretation: {interpretation}")
                     st.caption("Note: Vina-style docking scores are in kcal/mol; lower (more negative) indicates stronger predicted binding 🧭")
+                    # Suggestions to improve results
+                    suggestions = []
+                    if insights.get('promising_fraction', 0.0) < 0.25:
+                        suggestions.append('Increase `exhaustiveness` in the sidebar to allow more thorough sampling (e.g. 16-32).')
+                        suggestions.append('Increase `Number of poses` to sample more conformers (e.g. 10-50).')
+                        suggestions.append('Ensure receptor is prepared (PDBQT) and grid box centers on active site: use `Compute grid from receptor`.')
+                    if insights.get('stdev', 0.0) > 1.5:
+                        suggestions.append('High score variability: consider clustering poses or using consensus scoring for robust selection.')
+                    # ligand-based suggestions
+                    best_le = None
+                    if 'best' in insights and insights['best'] is not None:
+                        # If we have best pose and RDKit mol, compute LE in details
+                        if 'details' in locals():
+                            pass
+                    if suggestions:
+                        st.markdown("**Suggestions to improve results**")
+                        for s in suggestions:
+                            st.write(f"- {s}")
                 cols = st.columns(3)
                 # mark index of top pose (top = lowest score)
                 best_score = None
@@ -185,6 +187,61 @@ if run_button:
                     if p.get('score') is not None:
                         if best_score is None or p['score'] < best_score:
                             best_score = p['score']
+                # Find the best pose to interpret
+                best_pose = None
+                if best_score is not None:
+                    for p in poses:
+                        if p.get('score') is not None and abs(p['score'] - best_score) < 1e-6:
+                            best_pose = p
+                            break
+                # If best pose found, compute interpretation and display
+                if best_pose is not None:
+                    receptor_pdb_text = None
+                    if st.session_state.get('receptor_bytes'):
+                        try:
+                            receptor_pdb_text = st.session_state.get('receptor_bytes').decode('utf-8')
+                        except Exception:
+                            try:
+                                receptor_pdb_text = st.session_state.get('receptor_bytes').decode('latin-1')
+                            except Exception:
+                                receptor_pdb_text = None
+                    interp = compute_pose_interpretation(best_pose, receptor_pdb_text)
+                    st.markdown("---")
+                    st.markdown("**Best pose interpretation** 🔍")
+                    with st.expander("Show interpretation details", expanded=False):
+                        st.write(interp.get('text'))
+                        details = interp.get('details') or {}
+                        if details:
+                            for k, v in details.items():
+                                st.write(f"- **{k}**: {v}")
+                    # Recommendations based on top pose details
+                    more_suggestions = []
+                    det = interp.get('details') or {}
+                    le = None
+                    if det.get('ligand_efficiency') is not None:
+                        try:
+                            le = float(det.get('ligand_efficiency'))
+                        except Exception:
+                            le = None
+                    if le is not None:
+                        if le <= -0.4:
+                            more_suggestions.append('Excellent ligand efficiency — consider experimental validation and prioritize this compound. ✔️')
+                        elif le <= -0.3:
+                            more_suggestions.append('Good ligand efficiency — select for further optimization and SAR exploration. ⭐')
+                        else:
+                            more_suggestions.append('Low ligand efficiency — consider small-group optimization, reduce polar surface area, or improve interactions. ⚠️')
+                    # contacts
+                    if det.get('contacts_to_receptor'):
+                        try:
+                            contacts = det['contacts_to_receptor']['contacts']
+                            if contacts < 3:
+                                more_suggestions.append('Few close contacts with receptor detected — check grid box and ensure ligand is placed in pocket. Consider increasing `exhaustiveness` or `num_poses`.')
+                        except Exception:
+                            pass
+                    if more_suggestions:
+                        st.markdown('**Top-pose suggestions**')
+                        for s in more_suggestions:
+                            st.write(f"- {s}")
                 for i, pose in enumerate(poses, 1):
                     col = cols[(i - 1) % 3]
                     # pose should be a dict: {'score': float, 'mol': rdkit Mol or pdbqt path}
@@ -201,12 +258,24 @@ if run_button:
                             img = None
                     with col:
                         title = f"Pose {i}"
+                        badge = ''
+                        if pose.get('score') is not None:
+                            s = pose.get('score')
+                            if s <= -9:
+                                badge = ' 🔥'
+                            elif s <= -7:
+                                badge = ' ⭐'
+                            elif s <= -5:
+                                badge = ' ⚠️'
+                            else:
+                                badge = ' ❌'
                         if pose.get('score') is not None and best_score is not None and abs(pose.get('score') - best_score) < 1e-6:
                             title += " — 🏆 Best"
+                        title += badge
                         st.subheader(title)
                         st.write(f"Score: {score:.3f} kcal/mol" if score is not None else "Score: N/A")
                         if img is not None:
-                            st.image(img, use_column_width=True)
+                            st.image(img, width=image_width)
                         elif pdbqt_block is not None:
                             st.code('\n'.join(pdbqt_block.splitlines()[:12]) + '\n...')
                             if show_3d:
