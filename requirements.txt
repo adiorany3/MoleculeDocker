@@ -1,0 +1,6 @@
+streamlit
+pandas
+numpy
+rdkit-pypi
+py3Dmol
+pytest

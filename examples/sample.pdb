@@ -1,0 +1,13 @@
+HEADER    SIMPLE PDB EXAMPLE
+REMARK    Example PDB file with a short peptide (ALA-GLY)
+ATOM      1  N   ALA A   1      11.104  13.207  14.357  1.00  0.00           N
+ATOM      2  CA  ALA A   1      12.205  12.345  14.915  1.00  0.00           C
+ATOM      3  C   ALA A   1      12.585  12.638  16.360  1.00  0.00           C
+ATOM      4  O   ALA A   1      13.599  12.250  16.858  1.00  0.00           O
+ATOM      5  CB  ALA A   1      13.441  13.094  14.331  1.00  0.00           C
+ATOM      6  N   GLY A   2      11.735  13.318  16.977  1.00  0.00           N
+ATOM      7  CA  GLY A   2      12.011  13.616  18.360  1.00  0.00           C
+ATOM      8  C   GLY A   2      11.008  12.989  19.309  1.00  0.00           C
+ATOM      9  O   GLY A   2      11.153  12.122  20.195  1.00  0.00           O
+TER      10      GLY A   2
+END
