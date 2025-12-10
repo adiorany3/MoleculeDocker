@@ -13,7 +13,7 @@ except Exception:
 
 st.set_page_config(page_title="Molecule Docking Online", layout="wide")
 
-st.title("Molecul Docking Online")
+st.title("Molecule Docking Online")
 
 st.sidebar.header("Inputs")
 receptor_file = st.sidebar.file_uploader("Upload receptor (PDB or PDBQT)", type=["pdb", "pdbqt"])
