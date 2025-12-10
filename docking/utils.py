@@ -105,3 +105,33 @@ def pdb_to_3d_html(pdb_block: str, width: int = 400, height: int = 300) -> str:
     # Use internal _make_html to get full HTML
     return view._make_html()
 
+
+def compute_grid_from_pdb(pdb_path: str, margin: float = 5.0):
+    """Compute bounding box center and sizes from a PDB-like file.
+
+    Returns (center_x, center_y, center_z), (size_x, size_y, size_z)
+    """
+    xs = []
+    ys = []
+    zs = []
+    with open(pdb_path, 'r') as f:
+        for line in f:
+            if line.startswith(('ATOM', 'HETATM')):
+                try:
+                    x = float(line[30:38].strip())
+                    y = float(line[38:46].strip())
+                    z = float(line[46:54].strip())
+                    xs.append(x)
+                    ys.append(y)
+                    zs.append(z)
+                except Exception:
+                    continue
+    if not xs:
+        raise ValueError('No atom coordinates found in PDB file')
+    minx, maxx = min(xs), max(xs)
+    miny, maxy = min(ys), max(ys)
+    minz, maxz = min(zs), max(zs)
+    center = ((minx + maxx) / 2.0, (miny + maxy) / 2.0, (minz + maxz) / 2.0)
+    size = ((maxx - minx) + margin, (maxy - miny) + margin, (maxz - minz) + margin)
+    return center, size
+

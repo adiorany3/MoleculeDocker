@@ -1,0 +1,7 @@
+# Packages to install via conda-forge (recommended for RDKit/Open Babel)
+# Use: conda install -c conda-forge --file requirements-conda.txt
+rdkit
+openbabel
+autodock-vina
+py3Dmol
+pytest

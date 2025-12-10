@@ -1,4 +1,4 @@
-# Molecule Docking
+# Molecul Docking (Streamlit Demo)
 
 This repository contains a demo Streamlit application for molecular docking. It supports two modes:
 
@@ -9,14 +9,20 @@ This is intended as a prototype and educational tool, not a production-ready doc
 
 ## Quickstart (macOS / Linux)
 
-Install dependencies. Using conda for RDKit is recommended (most reliable):
+Install dependencies. Using conda for RDKit/Open Babel is recommended (most reliable):
 
 ```bash
 # Recommended: create a conda env
 conda create -n molecul python=3.10 -y
 conda activate molecul
-conda install -c conda-forge rdkit -y
+conda install -c conda-forge rdkit openbabel autodock-vina -y
 pip install -r requirements.txt
+
+Alternative: install all conda requirements from `requirements-conda.txt`:
+
+```bash
+conda install -c conda-forge --file requirements-conda.txt
+```
 ```
 
 Or with pip only (RDKit via rdkit-pypi may not include all features or be slow to install):
@@ -91,6 +97,7 @@ CI: a GitHub Actions workflow is included at `.github/workflows/ci.yml` that set
 Extra features:
 - **Convert to PDBQT**: use the Open Babel `obabel` CLI to convert uploaded PDB/MOL/SDF files to PDBQT (sidebar Convert to PDBQT button). If `obabel` isn't found, the app will show an error and fallback to mock docking.
 - **3D Viewer**: enable `Show 3D viewer (py3Dmol)` in the sidebar to visualize poses in the browser when py3Dmol is installed. Without RDKit the mock PDB pose still displays as a 3D model.
+ - **Compute grid**: use `Compute grid from receptor` in the sidebar to compute the docking box center and size from a receptor PDB. This automatically fills the `Center X/Y/Z` and `Size X/Y/Z` fields. (The calculation adds a small margin to the bounding box.)
 
 ## Notes and Limitations
 

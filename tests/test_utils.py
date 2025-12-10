@@ -20,4 +20,4 @@ ATOM      1  C   UNL A   1       0.000   0.000   0.000  1.00  0.00           C
 END
 """
     html = pdb_to_3d_html(pdb_block)
-    assert '<html' in html.lower()
+    assert '3dmolviewer' in html.lower() or '<script' in html.lower()

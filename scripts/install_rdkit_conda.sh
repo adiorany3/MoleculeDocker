@@ -20,8 +20,8 @@ echo "Activating env $ENV_NAME"
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$ENV_NAME"
 
-echo "Installing RDKit from conda-forge and other deps"
-conda install -c conda-forge rdkit -y
+echo "Installing RDKit/Open Babel/Vina from conda-forge and other deps"
+conda install -c conda-forge --file requirements-conda.txt -y
 pip install -r requirements.txt
 
 echo "Done. Activate with: conda activate $ENV_NAME"

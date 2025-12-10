@@ -1,6 +1,10 @@
 streamlit
 pandas
 numpy
-rdkit-pypi
 py3Dmol
 pytest
+
+# Optional packages (install via conda-forge):
+# rdkit
+# openbabel
+# autodock-vina

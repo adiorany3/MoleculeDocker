@@ -12,7 +12,7 @@ import random
 def read_molecule(path):
     """Try common file formats and return an RDKit Mol if possible, else None."""
     if Chem is None:
-        raise ImportError("RDKit not installed; please install rdkit-pypi or use conda to install rdkit")
+        raise ImportError("RDKit not installed; prefer installing RDKit via conda-forge (conda install -c conda-forge rdkit)")
 
     ext = os.path.splitext(path)[1].lower()
     if ext in [".sdf", ".mol"]:
