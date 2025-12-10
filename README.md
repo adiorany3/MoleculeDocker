@@ -123,4 +123,4 @@ If you want, I can now:
 - Add a converter from PDB/PDBQT using Open Babel if available
 - Add Dockerfile and CI
 
-Tell me which next step you'd like me to take.
+Compiled by Galuh Adi Insani
