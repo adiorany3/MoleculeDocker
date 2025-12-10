@@ -11,7 +11,7 @@ try:
 except Exception:
     RDKit_available = False
 
-st.set_page_config(page_title="Molecul Docking", layout="wide")
+st.set_page_config(page_title="Molecule Docking Online", layout="wide")
 
 st.title("Molecul Docking Online")
 
